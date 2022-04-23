@@ -1,5 +1,11 @@
 let correct_answer = ""; // global variable to store the current correct answer
 
+function on_page_load(){
+    register_answer_button_click_handlers();
+    fetch_a_new_question();
+}
+
+
 function on_question_load(question, answer_options, answer) {
     update_question_text(question);
     update_answer_buttons_text(answer_options);
@@ -7,6 +13,14 @@ function on_question_load(question, answer_options, answer) {
     fetch_clue_image_gif(answer);
 }
 
+function register_answer_button_click_handlers(){
+    //TBD
+}
+
+function fetch_a_new_question(){
+    //TBD
+}
+    
 function update_question_text(question) {
     // TBD update the text of the question
 }
