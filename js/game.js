@@ -7,6 +7,7 @@ let level = 1; // the current level
 let lives = 3; // the number of lives remaining
 
 function on_page_load() {
+    console.log("loaded")
     register_answer_button_clicks();
     fetch_new_question();
 }
@@ -59,6 +60,16 @@ function register_answer_button_clicks() {
 
 function fetch_new_question() {
     // TBD fetch question data from Trivia DB API then call on_question_load(question, answer_options, answer)
+    const fetch_response_processing_fn=function(response){
+        return response.json();
+    }
+    const json_processing_fn=function(json){
+        console.log(json);
+        
+        on_question_load()
+    }
+
+    fetch(TRIVIA_API_URL).then(fetch_response_processing_fn).then(json_processing_fn)
     // HINT: "javascript fetch api", "javascript get random number in range", "javascript add element into array at position"
 }
 
@@ -138,4 +149,5 @@ function go_to_homepage() {
 }
 
 // TBD call on_page_load when the page loads
+window.onload = on_page_load;
 // HINT: "javascript run code after page load"
