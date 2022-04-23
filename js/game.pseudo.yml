@@ -8,6 +8,16 @@
 
 - When answer is correct:
     - do something
+    - level inc
+    - button green 
+    - confetti 
+    - next question 
+    - display message correct answer
     
 - When answer is wrong:
     - do something
+    - dec heart
+    - button red
+    - display message incorrect answer
+    - next question
+    - if hearts 0 then denote msg and end game to restart again
