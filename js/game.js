@@ -1,220 +1,162 @@
-const TRIVIA_API_URL = "https://opentdb.com/api.php?amount=1&category=11&difficulty=DIFFICULTY&type=multiple";
-const TENOR_API_URL = "https://g.tenor.com/v1/search?q=QUERY&key=FIVJE9C9U2QZ&limit=10";
-const URL_PARAMS = new URLSearchParams(window.location.search);
+const TRIVIA_API_URL = "https://opentdb.com/api.php?amount=1&category=11&difficulty=easy&type=multiple"; // see https://opentdb.com/api_config.php
+const TENOR_API_KEY = "MY_TENOR_API_KEY"; // you need to replace this with your own API key from Tenor (see https://tenor.com/gifapi)
+const TENOR_API_URL = "https://g.tenor.com/v1/search?q=QUERY&key=API_KEY&limit=10".replace("API_KEY", TENOR_API_KEY);
 
-let level = 1;
-let lives_left = 3;
-let question = "";
-let answer = "";
-let answer_options = [];
-let is_game_over = false;
-let audio_enabled = URL_PARAMS.get('audio') === "true" || false;
-let difficulty = URL_PARAMS.get('difficulty') || "easy";
+let correct_answer = ""; // the current correct answer
+let level = 1; // the current level
+let lives = 3; // the number of lives remaining
 
-function loading(enabled) {
-    document.getElementById("loading_spinner").style.display = enabled ? "flex" : "none";
+function on_page_load() {
+    register_answer_button_clicks();
+    fetch_new_question();
 }
 
-function load_question_image(image_query) {
-    return fetch(TENOR_API_URL.replace("QUERY", image_query))
-        .then(response => response.json())
-        .then(data => {
-            const results_length = data["results"].length;
-            const media = data["results"][Math.floor(Math.random() * results_length)]["media"][0];
-            document.getElementById("question_image").addEventListener("load", (event) => {
-                event.target.setAttribute("src", media["gif"]["url"]);
-            }, {
-                once: true,
-            });
-            document.getElementById("question_image").setAttribute("src", media["nanogif"]["url"]);
+function on_question_load(question, answer_options, answer) {
+    update_question_text(question);
+    update_answer_buttons_text(answer_options);
+    store_correct_answer(answer);
+    fetch_clue_image_gif(answer);
+}
+
+function on_clue_image_gif_load(gif_url) {
+    update_clue_image(gif_url);
+}
+
+function on_answer_button_click(clicked_button) {
+    check_answer(clicked_button, on_correct_answer, on_wrong_answer);
+}
+
+function on_correct_answer(clicked_button) {
+    highlight_answer_button(clicked_button, "answer_button_correct");
+    after_n_seconds(function() {
+        increment_level();
+        update_level_heading();
+        fetch_new_question();
+    }, 1);
+}
+
+function on_wrong_answer(clicked_button) {
+    decrement_lives();
+    update_hearts();
+    highlight_answer_button(clicked_button, "answer_button_wrong");
+    after_n_seconds(function() {
+        check_lives(on_game_over, fetch_new_question);
+    }, 1);
+}
+
+function on_game_over() {
+    update_question_text("GAME OVER!");
+    fetch_clue_image_gif("game over");
+    hide_answer_buttons();
+    after_n_seconds(go_to_homepage, 3);
+}
+
+// Event functions
+function register_answer_button_clicks() {
+    let answer_buttons = document.getElementsByClassName("answer_button");
+    for (let i = 0; i < answer_buttons.length; ++i) {
+        answer_buttons[i].addEventListener("click", function(event) {
+            on_answer_button_click(event.currentTarget);
         });
+    }
 }
 
 function fetch_new_question() {
-    loading(true);
-    enable_buttons(true);
-    
-    fetch(TRIVIA_API_URL.replace("DIFFICULTY", difficulty))
+    fetch(TRIVIA_API_URL)
         .then(response => response.json())
         .then(data => {
             question = data["results"][0]["question"];
             answer = data["results"][0]["correct_answer"];
             answer_options = data["results"][0]["incorrect_answers"];
-            answer_options.splice(Math.random() * 4, 0, answer);
-
-            document.getElementById("question_text").innerHTML = question;
-            document.getElementById("option_1_button").innerHTML = answer_options[0];
-            document.getElementById("option_2_button").innerHTML = answer_options[1];
-            document.getElementById("option_3_button").innerHTML = answer_options[2];
-            document.getElementById("option_4_button").innerHTML = answer_options[3];
-            
-            return load_question_image(answer)
-                .catch(err => {
-                    throw err;
-                });
-        })
-        .catch(err => {
-            console.log(err);
-            return load_question_image("error")
-                .catch(err => {
-                    console.log(err);
-                });
-        })
-        .finally(() => {
-            loading(false);
+            answer_insert_index = Math.floor(Math.random() * 4);
+            answer_options.splice(answer_insert_index, 0, answer); // to insert the answer into the answer options
+            on_question_load(question, answer_options, answer);
         });
 }
 
-function playAudio(fileUrl) {
-    if (!audio_enabled) {
-        return;
-    }
-
-    let audio = new Audio(fileUrl);
-    audio.play();
+function update_question_text(question) {
+    document.getElementById("question_text").innerHTML = question;
 }
 
-function handle_correct_answer(clicked_button) {
-    confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-    });
+function update_answer_buttons_text(answer_options) {
+    let answer_buttons = document.getElementsByClassName("answer_button");
+    for (let i = 0; i < answer_buttons.length; ++i) {
+        answer_buttons[i].innerHTML = answer_options[i];
+    }
+}
 
-    playAudio("https://cdn.pixabay.com/download/audio/2021/08/04/audio_0625c1539c.mp3?filename=success-1-6297.mp3");
+function store_correct_answer(answer) {
+    correct_answer = answer;
+}
 
-    clicked_button.classList.add("answer_button_correct");
+function fetch_clue_image_gif(answer) {
+    fetch(TENOR_API_URL.replace("QUERY", answer))
+        .then(response => response.json())
+        .then(data => {
+            const results_length = data["results"].length;
+            const random_index = Math.floor(Math.random() * results_length);
+            const media = data["results"][random_index]["media"][0];
+            on_clue_image_gif_load(media["nanogif"]["url"]);
+        });       
+}
 
-    setTimeout(() => {
-        clicked_button.classList.remove("answer_button_correct");
-        level = level + 1;
-        document.getElementById("level_text").innerHTML = "Level " + level;
+function update_clue_image(gif_url) {
+    document.getElementById("question_clue_image").setAttribute("src", gif_url);
+}
+
+function check_answer(clicked_button, on_correct_answer, on_wrong_answer) {
+    if (clicked_button.innerHTML === correct_answer) {
+        on_correct_answer(clicked_button);
+    } else {
+        on_wrong_answer(clicked_button);
+    }
+}
+
+function highlight_answer_button(clicked_button, highlight_class) {
+    clicked_button.classList.add(highlight_class);
+    setTimeout(function() {
+        clicked_button.classList.remove(highlight_class);
+    }, 1000);
+}
+
+function after_n_seconds(function_to_execute, n) {
+    setTimeout(function_to_execute, n * 1000);
+}
+
+function increment_level() {
+    level = level + 1;
+}
+
+function update_level_heading() {
+    document.getElementById("level_heading").textContent = "Level " + level;
+}
+
+function decrement_lives() {
+    lives = lives - 1;
+}
+
+function update_hearts() {
+    let hearts = document.getElementsByClassName("ri-heart-3-fill");
+    hearts[hearts.length-1].className = "ri-heart-3-line";
+}
+
+function check_lives(on_game_over, fetch_new_question) {
+    if (lives === 0) {
+        on_game_over();
+    } else {
         fetch_new_question();
-    }, 1000);
-}
-
-function handle_wrong_answer(clicked_button) {
-    playAudio("https://cdn.pixabay.com/download/audio/2021/08/09/audio_d64d38a0b2.mp3?filename=crash-6711.mp3");
-
-    clicked_button.classList.add("answer_button_wrong");
-
-    setTimeout(() => {
-        clicked_button.classList.remove("answer_button_wrong");
-        lives_left = lives_left - 1;
-
-        heart_icons = document.getElementsByClassName("ri-heart-fill");
-        last_heart_icon = heart_icons.length - 1;
-        heart_icons[last_heart_icon].classList.add("ri-heart-line");
-        heart_icons[last_heart_icon].classList.remove("ri-heart-fill");
-
-        if (lives_left > 0) {
-            fetch_new_question();
-        } else {
-            handle_game_over();
-        }
-    }, 1000);
-}
-
-function handle_game_over() {
-    playAudio("https://cdn.pixabay.com/download/audio/2021/08/04/audio_2e8fc4a203.mp3?filename=rock-destroy-6409.mp3");
-
-    is_game_over = true;
-    answer_buttons = document.getElementsByClassName("answer_button");
-    for(let i = 1; i < answer_buttons.length; ++i){
-        answer_buttons[i].style.visibility = "hidden";
     }
-
-    document.getElementById("question_text").innerHTML = "Game Over! You reached Level " + level + ".";
-
-    load_question_image("game over")
-        .catch(err => {
-            console.log(err);
-        })
-        .finally(() => {
-            loading(false);
-            
-            let count = 3;
-            document.getElementById("option_1_button").innerHTML = "Restarting in " + count;
-            document.getElementById("option_1_button")
-            let interval_id = setInterval(function() {
-                if (count == 0) {
-                    clearInterval(interval_id);
-                    navigate_home();
-                } else if (count > 0) {
-                    count = count - 1;
-                    document.getElementById("option_1_button").innerHTML = "Restarting in " + count;
-                }
-            }, 1000);
-        });
 }
 
-function enable_buttons(enabled) {
-    answer_buttons = document.getElementsByClassName("answer_button");
+function hide_answer_buttons() {
+    let answer_buttons = document.getElementsByClassName("answer_button");
     for (let i = 0; i < answer_buttons.length; ++i) {
-        answer_button = answer_buttons[i];
-        answer_button.disabled = !enabled;
+        answer_buttons[i].style.visibility = 'hidden';
     }
 }
 
-function on_answer_click(event) {
-    enable_buttons(false);
-
-    const clicked_button = event.target;
-    const clicked_answer = clicked_button.innerHTML;
-
-    if (is_game_over) {
-        return;
-    }
-
-    let is_answer_correct = (clicked_answer === answer);
-
-    if (is_answer_correct) {
-        handle_correct_answer(clicked_button);
-    }
-    else {
-        handle_wrong_answer(clicked_button);
-    }
+function go_to_homepage() {
+    window.location.href = "index.html";
 }
 
-function update_window_url() {
-    window.history.replaceState({}, document.title, "/game.html?difficulty=" + difficulty + "&audio=" + audio_enabled);
-}
-
-function update_audio() {
-    document.getElementById("audio_button_icon").classList.add(audio_enabled ? "ri-volume-up-fill" : "ri-volume-mute-fill");
-    document.getElementById("audio_button_icon").classList.remove(audio_enabled ? "ri-volume-mute-fill" : "ri-volume-up-fill");
-    document.getElementById("audio_player").muted = !audio_enabled;
-    
-    update_window_url();
-}
-
-function navigate_home() {
-    window.location.href = "/?difficulty=" + difficulty + "&audio=" + audio_enabled;
-}
-
-window.onload = function() {
-    document.getElementById("audio_button").addEventListener("click", function(event) {
-        event.preventDefault();
-
-        audio_enabled = !audio_enabled;
-        update_audio();
-    });
-
-    document.getElementById("home_button").addEventListener("click", function(event) {
-        event.preventDefault();
-
-        navigate_home();
-    });
-
-    update_audio();
-
-    fetch_new_question();
-
-    answer_buttons = document.getElementsByClassName("answer_button");
-    for (let i = 0; i < answer_buttons.length; ++i) {
-        answer_button = answer_buttons[i];
-        answer_button.addEventListener("click", on_answer_click);
-    }
-}
-
-enable_buttons(false);
+window.onload = on_page_load;
